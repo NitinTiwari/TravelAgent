@@ -331,16 +331,25 @@ graph.add_edge("itinerary_agent", END)
 
 
 def get_checkpointer():
-    """Initializes PostgresSaver with autocommit, falling back to MemorySaver if unavailable."""
+    """Initializes PostgresSaver with a robust ConnectionPool, falling back to MemorySaver if unavailable."""
     if DATABASE_URL:
         try:
-            conn = psycopg.connect(DATABASE_URL, autocommit=True, connect_timeout=10)
-            saver = PostgresSaver(conn)
+            from psycopg_pool import ConnectionPool
+            pool = ConnectionPool(
+                DATABASE_URL,
+                min_size=1,
+                max_size=10,
+                max_idle=30,
+                timeout=30,
+                kwargs={"autocommit": True, "prepare_threshold": 0},
+            )
+            pool.open()
+            saver = PostgresSaver(pool)
             saver.setup()
-            print("[OK] Connected to PostgreSQL checkpointer (Neon / Remote)")
+            print("[OK] Connected to PostgreSQL ConnectionPool checkpointer (Neon / Remote)")
             return saver
         except Exception as e:
-            print(f"[WARN] PostgreSQL connection failed ({e}). Falling back to MemorySaver.")
+            print(f"[WARN] PostgreSQL connection pool failed ({e}). Falling back to MemorySaver.")
     
     print("[INFO] Using in-memory checkpoint saver.")
     return MemorySaver()
