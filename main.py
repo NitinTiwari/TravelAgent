@@ -8,6 +8,7 @@ import asyncio
 import psycopg
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import (
     AnyMessage,
     HumanMessage,
@@ -329,11 +330,22 @@ graph.add_edge("weather_agent", "itinerary_agent")
 graph.add_edge("itinerary_agent", END)
 
 
-# Persistent connection so both CLI and Streamlit can share the compiled app
-_conn = psycopg.connect(DATABASE_URL, autocommit=True)
-checkpointer = PostgresSaver(_conn)
-checkpointer.setup()
+def get_checkpointer():
+    """Initializes PostgresSaver with autocommit, falling back to MemorySaver if unavailable."""
+    if DATABASE_URL:
+        try:
+            conn = psycopg.connect(DATABASE_URL, autocommit=True, connect_timeout=10)
+            saver = PostgresSaver(conn)
+            saver.setup()
+            print("[OK] Connected to PostgreSQL checkpointer (Neon / Remote)")
+            return saver
+        except Exception as e:
+            print(f"[WARN] PostgreSQL connection failed ({e}). Falling back to MemorySaver.")
+    
+    print("[INFO] Using in-memory checkpoint saver.")
+    return MemorySaver()
 
+checkpointer = get_checkpointer()
 app = graph.compile(checkpointer=checkpointer)
 
 

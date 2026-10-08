@@ -53,10 +53,7 @@ LANGCHAIN_TRACING_V2 = get_config_val("LANGCHAIN_TRACING_V2", "false")
 LANGCHAIN_PROJECT = get_config_val("LANGCHAIN_PROJECT", "Multi-Agent-Travel-MCP")
 
 # PostgreSQL Database Connection URL for LangGraph Checkpointer
-DATABASE_URL = get_config_val(
-    "DATABASE_URL", 
-    "postgresql://postgres:postgres@localhost:5432/langgraph_memory_demo"
-)
+DATABASE_URL = get_config_val("DATABASE_URL", "")
 
 # ==========================================
 # 🤖 LLM Models Configuration
