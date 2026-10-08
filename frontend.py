@@ -19,10 +19,44 @@ html, body, .stApp {
     background-color: #080d14;
     margin: 0;
     padding: 0;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    min-height: 100vh;
+}
+
+/* ── Remove unnecessary top gaps ── */
+.block-container,
+[data-testid="stMainBlockContainer"],
+[data-testid="stAppViewBlockContainer"] {
+    padding-top: 0.8rem !important;
+    padding-bottom: 2rem !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}
+
+section[data-testid="stSidebar"] > div:first-child,
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 0.8rem !important;
+    padding-bottom: 1rem !important;
+}
+
+/* ── Header & Sidebar Toggle Controls ── */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapseButton"] {
+    visibility: visible !important;
+    display: flex !important;
+    color: #7ab8f5 !important;
+    z-index: 999999 !important;
+}
+
+[data-testid="collapsedControl"] button,
+[data-testid="stSidebarCollapseButton"] button {
+    background: #0e1a2b !important;
+    color: #7ab8f5 !important;
+    border: 1px solid #1e2e44 !important;
+    border-radius: 8px !important;
 }
 
 /* ── Hero ── */
@@ -30,8 +64,9 @@ html, body, .stApp {
     position: relative;
     border-radius: 20px;
     overflow: hidden;
-    margin-bottom: 2rem;
-    height: 280px;
+    margin-top: 0 !important;
+    margin-bottom: 1.5rem;
+    height: 270px;
 }
 .hero-bg {
     width: 100%;
@@ -224,10 +259,11 @@ section[data-testid="stSidebar"] {
     font-size: 0.83rem;
     color: #7aa8cc;
 }
-.sidebar-title { color: #e0edf8; font-size: 1rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+.sidebar-title { color: #e0edf8; font-size: 1.05rem; font-weight: 600; margin: 0.8rem 0 0.4rem; }
+.sidebar-title:first-of-type { margin-top: 0 !important; }
 
 /* Hide branding */
-#MainMenu, footer, header { visibility: hidden; }
+#MainMenu, footer { visibility: hidden !important; }
 
 /* Textarea */
 .stTextArea textarea {
@@ -361,17 +397,17 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ── Input ─────────────────────────────────────────────────────────────────────
 st.markdown("<div class='input-label'>🗺️ Describe your trip</div>", unsafe_allow_html=True)
 
-QUICK = ["7-day Japan under ₹2L", "Paris trip for 5 days", "Dubai weekend trip", "Bali backpacking 10 days"]
-qcols = st.columns(len(QUICK))
-quick_fill = ""
-for qc, label in zip(qcols, QUICK):
-    with qc:
-        if st.button(label, key=f"q_{label}"):
-            quick_fill = label
+# QUICK = ["7-day Japan under ₹2L", "Paris trip for 5 days", "Dubai weekend trip", "Bali backpacking 10 days"]
+# qcols = st.columns(len(QUICK))
+# quick_fill = ""
+# for qc, label in zip(qcols, QUICK):
+#     with qc:
+#         if st.button(label, key=f"q_{label}"):
+#             quick_fill = label
 
 user_query = st.text_area(
     "Describe your trip",
-    value=quick_fill,
+    # value=quick_fill,
     placeholder="e.g. Plan a complete 4-day Kashi Vishwanath, Varanasi trip including flights, hotels and sightseeing under ₹1.5 lakhs",
     height=100,
     label_visibility="collapsed",
