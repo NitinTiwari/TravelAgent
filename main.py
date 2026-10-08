@@ -127,68 +127,149 @@ def flight_agent(state: TravelState):
 
 
 
+# Hotel Agent Prompt
+HOTEL_AGENT_PROMPT = """
+You are an expert travel accommodation and hotel advisor.
+
+User Travel Request:
+{query}
+
+Web Search Results & Hotel Data:
+{hotel_search_data}
+
+Please generate a well-structured, easy-to-read hotel guide for the user:
+1. 🏨 Top Recommended Hotels (categorize by Budget, Mid-range, and Luxury/Heritage options if available)
+2. 📍 Location & Proximity (distance to main attractions, temples, Ghats, station, or city center mentioned in user request)
+3. 💰 Estimated Price Range & Budget Fit (keeping the user's budget and number of guests in mind)
+4. ✨ Key Amenities & Highlights (family-friendly, AC, Wi-Fi, pure veg dining, cleanliness)
+5. 💡 Booking & Stay Advice (recommended area to stay, peak rush warnings, booking tips)
+6. 🔗 Reference Links (if available in the search results)
+
+Return a clean, beautifully formatted Markdown guide.
+"""
+
+def extract_hotel_search_summary(raw_data) -> str:
+    """Parses raw Tavily MCP or HTTP responses into clean text snippets."""
+    if not raw_data:
+        return "No hotel search results found."
+
+    text_content = ""
+    if isinstance(raw_data, list):
+        for item in raw_data:
+            if isinstance(item, dict) and "text" in item:
+                text_content += item["text"] + "\n"
+            elif hasattr(item, "text"):
+                text_content += getattr(item, "text") + "\n"
+            elif isinstance(item, str):
+                text_content += item + "\n"
+    elif isinstance(raw_data, dict):
+        if "results" in raw_data and isinstance(raw_data["results"], list):
+            formatted_items = []
+            for r in raw_data["results"]:
+                title = r.get("title", "Hotel Option")
+                url = r.get("url", "")
+                content = r.get("content", "")
+                formatted_items.append(f"- **{title}** ({url})\n  {content}")
+            return "\n\n".join(formatted_items)
+        text_content = str(raw_data)
+    else:
+        text_content = str(raw_data)
+
+    # If text_content contains serialized JSON from Tavily, unpack it
+    try:
+        import json
+        parsed = json.loads(text_content.strip())
+        if isinstance(parsed, dict) and "results" in parsed:
+            formatted_items = []
+            for r in parsed["results"]:
+                title = r.get("title", "Hotel Option")
+                url = r.get("url", "")
+                content = r.get("content", "")
+                formatted_items.append(f"- **{title}** ({url})\n  {content}")
+            return "\n\n".join(formatted_items)
+    except Exception:
+        pass
+
+    return text_content[:4000]
+
 # Hotel Agent
 def hotel_agent(state: TravelState):
+    print("\nINSIDE HOTEL AGENT\n")
     query = f"Best hotels for {state['user_query']}"
-    # Attempt to fetch hotel results via the TAVILY MCP tool.
-    # If the underlying subprocess cannot locate the executable, catch the error.
+    raw_hotel_data = ""
+
     try:
-        hotel_results = asyncio.run(tavily_mcp_search(query))
+        raw_hotel_data = asyncio.run(tavily_mcp_search(query))
     except FileNotFoundError as fnf_err:
-        import traceback, httpx
-        traceback.print_exc()
+        import httpx
         if TAVILY_API_KEY:
             try:
                 response = httpx.post(
                     "https://api.tavily.com/search",
-                    json={"api_key": TAVILY_API_KEY, "query": query, "search_depth": 2},
+                    json={"api_key": TAVILY_API_KEY, "query": query, "search_depth": "advanced", "max_results": 6},
                     timeout=30,
                 )
-                hotel_results = response.json()
+                raw_hotel_data = response.json()
             except Exception as e:
-                hotel_results = f"⚠️ Hotel search failed (fallback HTTP error): {e}"
+                raw_hotel_data = f"Hotel search fallback error: {e}"
         else:
-            hotel_results = "⚠️ Hotel search failed – API key not set."
+            raw_hotel_data = "Tavily API key not set."
     except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        hotel_results = f"⚠️ Hotel search encountered an error: {exc}"
+        raw_hotel_data = f"Hotel search encountered an error: {exc}"
+
+    # Extract clean search summary from raw tool output
+    search_summary = extract_hotel_search_summary(raw_hotel_data)
+
+    # Pass through LLM to generate structured, human-readable hotel advice
+    try:
+        prompt = HOTEL_AGENT_PROMPT.format(
+            query=state["user_query"],
+            hotel_search_data=search_summary
+        )
+        response = llm.invoke([
+            SystemMessage(content="You are an expert travel accommodation advisor."),
+            HumanMessage(content=prompt)
+        ])
+        hotel_data = response.content
+    except Exception as e:
+        hotel_data = search_summary if search_summary else f"Hotel information unavailable: {e}"
+
     print("✅ hotel_agent completed")
     return {
-        "hotel_results": hotel_results,
+        "hotel_results": hotel_data,
         "messages": [
-            AIMessage(content="Hotel information fetched (or error reported)")
+            AIMessage(content="Hotel recommendations generated")
         ],
         "llm_calls": state.get("llm_calls", 0) + 1
     }
 
 
-
-
 def weather_agent(state: TravelState):
-
+    print("\nINSIDE WEATHER AGENT\n")
     city = extract_destination(state["user_query"])
 
-    weather_data = asyncio.run(
-        weather_mcp_search(city)
-    )
+    try:
+        weather_data = asyncio.run(weather_mcp_search(city))
+    except Exception as e:
+        weather_data = f"Current weather unavailable: {e}"
 
-    forecast_data = asyncio.run(
-        forecast_mcp_search(city)
-    )
+    try:
+        forecast_data = asyncio.run(forecast_mcp_search(city))
+    except Exception as e:
+        forecast_data = f"Forecast unavailable: {e}"
+
+    formatted_weather = f"""### 🌤️ Weather Report for {city.title()}
+- **Current Weather Conditions**:
+{weather_data}
+
+- **5-Day Weather Forecast**:
+{forecast_data}
+"""
 
     return {
-        "weather_results": f"""
-        Current Weather:
-        {weather_data}
-
-        Forecast:
-        {forecast_data}
-        """,
+        "weather_results": formatted_weather,
         "messages": [
-            AIMessage(
-                content="Weather information fetched"
-            )
+            AIMessage(content="Weather information fetched")
         ]
     }
 
