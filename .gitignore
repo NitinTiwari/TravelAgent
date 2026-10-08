@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Environments & Virtual Envs
+.venv/
+venv/
+ENV/
+env/
+langraph_env3/
+aviationstack-mcp/.venv/
+
+# Environment Variables & Secrets (CRITICAL)
+.env
+.env.local
+.env.*.local
+
+# Executables & Binaries
+uv.exe
+*.exe
+*.dll
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# Streamlit
+.streamlit/
