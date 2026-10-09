@@ -499,46 +499,49 @@ if generate:
         st.markdown("<div class='sec-head'><span>🤖 Agent Pipeline — Live</span></div>",
                     unsafe_allow_html=True)
 
-        for chunk in app.stream(
-            {
-                "messages": [HumanMessage(content=user_query)],
-                "user_query": user_query,
-                "flight_results": "",
-                "hotel_results": "",
-                "weather_results": "",
-                "itinerary": "",
-                "llm_calls": 0,
-            },
-            config=config,
-            stream_mode="updates",
-        ):
-            for node_name, state_update in chunk.items():
-                agents_run += 1
-                icon, label = AGENT_META.get(node_name, ("🔧", node_name))
+        try:
+            for chunk in app.stream(
+                {
+                    "messages": [HumanMessage(content=user_query)],
+                    "user_query": user_query,
+                    "flight_results": "",
+                    "hotel_results": "",
+                    "weather_results": "",
+                    "itinerary": "",
+                    "llm_calls": 0,
+                },
+                config=config,
+                stream_mode="updates",
+            ):
+                for node_name, state_update in chunk.items():
+                    agents_run += 1
+                    icon, label = AGENT_META.get(node_name, ("🔧", node_name))
 
-                with st.status(f"{icon}  {label}", state="complete", expanded=True):
-                    if node_name == "flight_agent":
-                        text = state_update.get("flight_results", "")
-                        collected["flight_results"] = text
-                        st.markdown(text or "_No flight data returned._")
+                    with st.status(f"{icon}  {label}", state="complete", expanded=True):
+                        if node_name == "flight_agent":
+                            text = state_update.get("flight_results", "")
+                            collected["flight_results"] = text
+                            st.markdown(text or "_No flight data returned._")
 
-                    elif node_name == "hotel_agent":
-                        text = state_update.get("hotel_results", "")
-                        collected["hotel_results"] = text
-                        st.markdown(text or "_No hotel data returned._")
+                        elif node_name == "hotel_agent":
+                            text = state_update.get("hotel_results", "")
+                            collected["hotel_results"] = text
+                            st.markdown(text or "_No hotel data returned._")
 
-                    elif node_name == "weather_agent":
-                        text = state_update.get("weather_results", "")
-                        collected["weather_results"] = text
-                        st.markdown(text or "_No weather data returned._")
+                        elif node_name == "weather_agent":
+                            text = state_update.get("weather_results", "")
+                            collected["weather_results"] = text
+                            st.markdown(text or "_No weather data returned._")
 
-                    elif node_name == "itinerary_agent":
-                        text = state_update.get("itinerary", "")
-                        collected["itinerary"] = text
-                        collected["final_response"] = text
-                        st.markdown(text or "_No itinerary generated._")
+                        elif node_name == "itinerary_agent":
+                            text = state_update.get("itinerary", "")
+                            collected["itinerary"] = text
+                            collected["final_response"] = text
+                            st.markdown(text or "_No itinerary generated._")
 
-                    collected["llm_calls"] = state_update.get("llm_calls", collected["llm_calls"])
+                        collected["llm_calls"] = state_update.get("llm_calls", collected["llm_calls"])
+        except Exception as stream_err:
+            st.error(f"⚠️ An error occurred during plan generation: {stream_err}")
 
         # Metrics
         st.markdown(f"""

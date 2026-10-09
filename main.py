@@ -353,9 +353,19 @@ def get_checkpointer():
                 DATABASE_URL,
                 min_size=1,
                 max_size=10,
-                max_idle=30,
-                timeout=30,
-                kwargs={"autocommit": True, "prepare_threshold": 0},
+                max_idle=60.0,
+                max_lifetime=600.0,
+                timeout=30.0,
+                check=ConnectionPool.check_connection,
+                reconnect_timeout=30.0,
+                kwargs={
+                    "autocommit": True,
+                    "prepare_threshold": 0,
+                    "keepalives": 1,
+                    "keepalives_idle": 30,
+                    "keepalives_interval": 10,
+                    "keepalives_count": 5,
+                },
             )
             pool.open()
             saver = PostgresSaver(pool)
