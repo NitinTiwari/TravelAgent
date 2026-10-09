@@ -1,4 +1,3 @@
-
 # LangGraph Multi-Agent Travel Booking System with Long-Term Memory
 
 import os
@@ -20,7 +19,7 @@ from langchain_groq import ChatGroq
 
 # from tools.tavily_tool import tavily_search
 
-#from mcp_client import tavily_mcp_search
+# from mcp_client import tavily_mcp_search
 
 from mcp_client import (
     tavily_mcp_search,
@@ -31,6 +30,7 @@ from mcp_client import (
     forecast_mcp_search,
     weather_mcp_search
 )
+from logger import logger, setup_session_logger
 from settings import DATABASE_URL, GROQ_PLANNER_MODEL, TAVILY_API_KEY
 
 ###############################################################################
@@ -45,6 +45,7 @@ from settings import DATABASE_URL, GROQ_PLANNER_MODEL, TAVILY_API_KEY
 # - Maintains persistent conversation state (TravelState) and message history across turns.
 # - Integrates PostgreSQL ConnectionPool checkpointer (PostgresSaver) with automated fallback
 #   to in-memory checkpointing (MemorySaver) for resilient state persistence.
+# - Comprehensive event and session logging via logger.py.
 ###############################################################################
 
 # LLM
@@ -93,12 +94,12 @@ Return concise travel guidance.
 
 # Flight Agent
 def flight_agent(state: TravelState):
-    print("\nINSIDE FLIGHT AGENT\n")
-
+    logger.info("✈️ [flight_agent] Node started")
     query = state["user_query"]
+    logger.debug(f"[flight_agent] Processing query: {query}")
 
     try:
-
+        logger.debug("[flight_agent] Invoking AviationStack MCP: list_airports & list_airlines")
         airports = asyncio.run(
             aviation_mcp_call(
                 "list_airports"
@@ -117,6 +118,7 @@ def flight_agent(state: TravelState):
             airline_data=str(airlines)[:3000]
         )
 
+        logger.debug("[flight_agent] Invoking Groq LLM for flight estimation")
         response = llm.invoke([
             SystemMessage(
                 content="You are an expert travel flight planner."
@@ -125,10 +127,11 @@ def flight_agent(state: TravelState):
         ])
 
         flight_data = response.content
+        logger.info("✅ [flight_agent] Flight guidance generated successfully")
 
     except Exception as e:
-
         flight_data = f"Flight information unavailable: {str(e)}"
+        logger.error(f"❌ [flight_agent] Error: {e}", exc_info=True)
 
     return {
         "flight_results": flight_data,
@@ -209,14 +212,17 @@ def extract_hotel_search_summary(raw_data) -> str:
 
 # Hotel Agent
 def hotel_agent(state: TravelState):
-    print("\nINSIDE HOTEL AGENT\n")
+    logger.info("🏨 [hotel_agent] Node started")
     query = f"Best hotels for {state['user_query']}"
     raw_hotel_data = ""
+    logger.debug(f"[hotel_agent] Query: {query}")
 
     try:
+        logger.debug("[hotel_agent] Querying Tavily MCP Search")
         raw_hotel_data = asyncio.run(tavily_mcp_search(query))
     except FileNotFoundError as fnf_err:
         import httpx
+        logger.warning(f"[hotel_agent] MCP transport unavailable ({fnf_err}), using Tavily HTTP fallback")
         if TAVILY_API_KEY:
             try:
                 response = httpx.post(
@@ -227,16 +233,20 @@ def hotel_agent(state: TravelState):
                 raw_hotel_data = response.json()
             except Exception as e:
                 raw_hotel_data = f"Hotel search fallback error: {e}"
+                logger.error(f"[hotel_agent] HTTP fallback error: {e}")
         else:
             raw_hotel_data = "Tavily API key not set."
+            logger.error("[hotel_agent] Tavily API key not configured")
     except Exception as exc:
         raw_hotel_data = f"Hotel search encountered an error: {exc}"
+        logger.error(f"[hotel_agent] Search error: {exc}", exc_info=True)
 
     # Extract clean search summary from raw tool output
     search_summary = extract_hotel_search_summary(raw_hotel_data)
 
     # Pass through LLM to generate structured, human-readable hotel advice
     try:
+        logger.debug("[hotel_agent] Invoking Groq LLM for hotel categorization")
         prompt = HOTEL_AGENT_PROMPT.format(
             query=state["user_query"],
             hotel_search_data=search_summary
@@ -246,10 +256,11 @@ def hotel_agent(state: TravelState):
             HumanMessage(content=prompt)
         ])
         hotel_data = response.content
+        logger.info("✅ [hotel_agent] Hotel recommendations generated successfully")
     except Exception as e:
         hotel_data = search_summary if search_summary else f"Hotel information unavailable: {e}"
+        logger.error(f"❌ [hotel_agent] LLM synthesis error: {e}", exc_info=True)
 
-    print("✅ hotel_agent completed")
     return {
         "hotel_results": hotel_data,
         "messages": [
@@ -260,18 +271,23 @@ def hotel_agent(state: TravelState):
 
 
 def weather_agent(state: TravelState):
-    print("\nINSIDE WEATHER AGENT\n")
+    logger.info("🌤️ [weather_agent] Node started")
     city = extract_destination(state["user_query"])
+    logger.info(f"📍 [weather_agent] Extracted destination city: {city}")
 
     try:
+        logger.debug(f"[weather_agent] Fetching current weather for: {city}")
         weather_data = asyncio.run(weather_mcp_search(city))
     except Exception as e:
         weather_data = f"Current weather unavailable: {e}"
+        logger.error(f"[weather_agent] Current weather error: {e}", exc_info=True)
 
     try:
+        logger.debug(f"[weather_agent] Fetching 5-day forecast for: {city}")
         forecast_data = asyncio.run(forecast_mcp_search(city))
     except Exception as e:
         forecast_data = f"Forecast unavailable: {e}"
+        logger.error(f"[weather_agent] Forecast error: {e}", exc_info=True)
 
     formatted_weather = f"""### 🌤️ Weather Report for {city.title()}
 - **Current Weather Conditions**:
@@ -280,6 +296,7 @@ def weather_agent(state: TravelState):
 - **5-Day Weather Forecast**:
 {forecast_data}
 """
+    logger.info("✅ [weather_agent] Weather data retrieved successfully")
 
     return {
         "weather_results": formatted_weather,
@@ -289,11 +306,9 @@ def weather_agent(state: TravelState):
     }
 
 
-
-
-
 # Itinerary Agent
 def itinerary_agent(state: TravelState):
+    logger.info("🗓️ [itinerary_agent] Node started - Final Master Plan Synthesis")
 
     prompt = f"""
     Create a travel itinerary.
@@ -310,23 +325,26 @@ def itinerary_agent(state: TravelState):
     {state['weather_results']}
     """
 
-    response = llm.invoke([
-        SystemMessage(
-            content="You are an expert travel planner"
-        ),
-        HumanMessage(content=prompt)
-    ])
+    try:
+        logger.debug("[itinerary_agent] Invoking Groq LLM for master itinerary synthesis")
+        response = llm.invoke([
+            SystemMessage(
+                content="You are an expert travel planner"
+            ),
+            HumanMessage(content=prompt)
+        ])
+        itinerary_data = response.content
+        logger.info("✅ [itinerary_agent] Master itinerary generated successfully")
+    except Exception as e:
+        itinerary_data = f"Itinerary generation encountered an error: {e}"
+        logger.error(f"❌ [itinerary_agent] Error: {e}", exc_info=True)
+        response = AIMessage(content=itinerary_data)
 
     return {
-        "itinerary": response.content,
+        "itinerary": itinerary_data,
         "messages": [response],
         "llm_calls": state.get("llm_calls", 0) + 1
     }
-
-
-
-
-
 
 
 graph = StateGraph(TravelState)
@@ -370,12 +388,12 @@ def get_checkpointer():
             pool.open()
             saver = PostgresSaver(pool)
             saver.setup()
-            print("[OK] Connected to PostgreSQL ConnectionPool checkpointer (Neon / Remote)")
+            logger.info("[OK] Connected to PostgreSQL ConnectionPool checkpointer (Neon / Remote)")
             return saver
         except Exception as e:
-            print(f"[WARN] PostgreSQL connection pool failed ({e}). Falling back to MemorySaver.")
+            logger.warning(f"[WARN] PostgreSQL connection pool failed ({e}). Falling back to MemorySaver.")
     
-    print("[INFO] Using in-memory checkpoint saver.")
+    logger.info("[INFO] Using in-memory checkpoint saver.")
     return MemorySaver()
 
 checkpointer = get_checkpointer()
@@ -383,17 +401,18 @@ app = graph.compile(checkpointer=checkpointer)
 
 
 if __name__ == "__main__":
-
-    # every run starts fresh.
     import uuid
+    thread_id = str(uuid.uuid4())
+    session_log, log_file = setup_session_logger(thread_id)
+
     config = {
         "configurable": {
-            "thread_id": str(uuid.uuid4())
+            "thread_id": thread_id
         }
     }
 
-
     user_input = input("Enter travel request: ")
+    session_log.info(f"User Request: {user_input}")
 
     result = app.invoke(
         {
@@ -409,7 +428,10 @@ if __name__ == "__main__":
         config=config
     )
 
+    session_log.info("🎉 Multi-agent pipeline execution completed successfully!")
     print("\nFINAL RESPONSE:\n")
 
     for msg in result["messages"]:
         print(msg.content)
+    
+    print(f"\n📁 Session log saved to: {log_file}")

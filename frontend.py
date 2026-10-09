@@ -4,6 +4,7 @@ from datetime import datetime
 from langchain_core.messages import HumanMessage
 from main import app
 from r2_storage import upload_plan_to_r2, is_r2_configured
+from logger import setup_session_logger
 
 ###############################################################################
 # Streamlit Interactive Web Application & Travel Concierge UI
@@ -484,6 +485,11 @@ if generate:
     if not user_query.strip():
         st.warning("Please describe your trip first.")
     else:
+        # Initialize session-specific logger file
+        session_logger, session_log_path = setup_session_logger(thread_id)
+        session_logger.info(f"User Query: {user_query}")
+        session_logger.info(f"Thread ID: {thread_id}")
+
         config = {"configurable": {"thread_id": thread_id}}
         collected = {
             "flight_results": "",
@@ -516,6 +522,7 @@ if generate:
                 for node_name, state_update in chunk.items():
                     agents_run += 1
                     icon, label = AGENT_META.get(node_name, ("🔧", node_name))
+                    session_logger.info(f"Node execution completed: {node_name}")
 
                     with st.status(f"{icon}  {label}", state="complete", expanded=True):
                         if node_name == "flight_agent":
@@ -540,7 +547,9 @@ if generate:
                             st.markdown(text or "_No itinerary generated._")
 
                         collected["llm_calls"] = state_update.get("llm_calls", collected["llm_calls"])
+            session_logger.info("Graph streaming completed successfully.")
         except Exception as stream_err:
+            session_logger.error(f"Error during graph execution: {stream_err}", exc_info=True)
             st.error(f"⚠️ An error occurred during plan generation: {stream_err}")
 
         # Metrics
@@ -597,25 +606,39 @@ if generate:
         # Save locally
         with open(os.path.join(save_dir, filename), "w", encoding="utf-8") as f:
             f.write(file_content)
+        session_logger.info(f"Saved travel plan to {os.path.join(save_dir, filename)}")
 
         # Upload to Cloudflare R2 Object Storage
         r2_status = None
         if is_r2_configured():
             r2_status = upload_plan_to_r2(filename, file_content)
+            session_logger.info(f"Cloudflare R2 upload result: {r2_status}")
 
-        dl_col, info_col = st.columns([1, 3])
-        with dl_col:
-            st.download_button("⬇️ Download Plan", data=file_content,
+        session_logger.info("Session complete.")
+
+        # Read session log content for download
+        log_content = ""
+        if os.path.exists(session_log_path):
+            with open(session_log_path, "r", encoding="utf-8") as lf:
+                log_content = lf.read()
+
+        dl_col1, dl_col2, info_col = st.columns([1.2, 1.2, 2.6])
+        with dl_col1:
+            st.download_button("⬇️ Download Plan (.md)", data=file_content,
                                file_name=filename, mime="text/markdown",
                                use_container_width=True)
+        with dl_col2:
+            st.download_button("📜 Download Log (.log)", data=log_content,
+                               file_name=os.path.basename(session_log_path),
+                               mime="text/plain", use_container_width=True)
         with info_col:
             if r2_status and r2_status.get("success"):
                 st.markdown(
-                    f"<div class='save-bar'>☁️ Saved to Cloudflare R2 → <code>{r2_status['key']}</code></div>",
+                    f"<div class='save-bar'>☁️ Saved to R2 → <code>{r2_status['key']}</code><br>📄 Log → <code>{os.path.basename(session_log_path)}</code></div>",
                     unsafe_allow_html=True
                 )
             else:
                 st.markdown(
-                    f"<div class='save-bar'>📁 Auto-saved → <code>travel_plans/{filename}</code></div>",
+                    f"<div class='save-bar'>📁 Saved → <code>travel_plans/{filename}</code><br>📄 Log → <code>logs/{os.path.basename(session_log_path)}</code></div>",
                     unsafe_allow_html=True
                 )
