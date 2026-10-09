@@ -13,6 +13,15 @@ import os
 import requests
 from dotenv import load_dotenv
 
+###############################################################################
+# Direct AviationStack Flight Search Tool
+#
+# Functional Details:
+# - Directly communicates with the AviationStack REST API endpoint (/v1/flights).
+# - Searches and parses active flight schedules, airline names, and departure/arrival airports.
+# - Serves as a standalone tool module for flight information retrieval.
+###############################################################################
+
 load_dotenv()
 
 API_KEY = os.getenv("AVIATIONSTACK_API_KEY")

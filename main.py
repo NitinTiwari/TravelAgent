@@ -33,6 +33,20 @@ from mcp_client import (
 )
 from settings import DATABASE_URL, GROQ_PLANNER_MODEL, TAVILY_API_KEY
 
+###############################################################################
+# LangGraph Multi-Agent Travel Planning Workflow & PostgreSQL Memory Checkpointer
+#
+# Functional Details:
+# - Orchestrates a sequential multi-agent travel concierge pipeline:
+#     1. flight_agent: Queries airport & flight data via AviationStack MCP and Tavily fallback.
+#     2. hotel_agent: Gathers accommodation recommendations and pricing via Tavily MCP.
+#     3. weather_agent: Retrieves current weather & multi-day forecasts via OpenWeather MCP.
+#     4. itinerary_agent: Synthesizes all gathered data into a comprehensive travel plan.
+# - Maintains persistent conversation state (TravelState) and message history across turns.
+# - Integrates PostgreSQL ConnectionPool checkpointer (PostgresSaver) with automated fallback
+#   to in-memory checkpointing (MemorySaver) for resilient state persistence.
+###############################################################################
+
 # LLM
 llm = ChatGroq(
     model=GROQ_PLANNER_MODEL

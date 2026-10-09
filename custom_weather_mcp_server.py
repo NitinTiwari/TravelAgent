@@ -9,6 +9,16 @@ try:
 except ImportError:
     OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
+###############################################################################
+# FastMCP Custom Weather Server
+#
+# Functional Details:
+# - Exposes OpenWeather API capabilities as a Model Context Protocol (MCP) server.
+# - get_current_weather: Returns real-time temperature, humidity, condition, and wind speed.
+# - get_forecast: Provides a 5-day / 3-hour interval weather forecast for any specified city.
+# - Enables seamless tool invocation for LLM agents via FastMCP stdio transport.
+###############################################################################
+
 mcp = FastMCP("Weather Server")
 
 @mcp.tool()

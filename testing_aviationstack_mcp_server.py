@@ -1,10 +1,19 @@
 import os
+import asyncio
 from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
+from settings import AVIATIONSTACK_API_KEY, AVIATIONSTACK_COMMAND, AVIATIONSTACK_SRC_DIR
+
+###############################################################################
+# AviationStack MCP Server Diagnostic & Test Runner
+#
+# Functional Details:
+# - Spawns and attaches to the AviationStack MCP server subprocess using stdio transport.
+# - Discovers and lists all registered aviation tools (airports, airlines, flights).
+# - Validates subproject virtual environment, PYTHONPATH, and API key configurations.
+###############################################################################
 
 load_dotenv()
-
-from settings import AVIATIONSTACK_API_KEY, AVIATIONSTACK_COMMAND, AVIATIONSTACK_SRC_DIR
 
 client = MultiServerMCPClient(
     {
@@ -23,9 +32,6 @@ client = MultiServerMCPClient(
         }
     }
 )
-
-
-import asyncio
 
 async def main():
 

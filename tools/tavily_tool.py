@@ -1,6 +1,15 @@
-from tavily import TavilyClient
 import os
 from dotenv import load_dotenv
+from tavily import TavilyClient
+
+###############################################################################
+# Direct Tavily Search Engine Tool
+#
+# Functional Details:
+# - Connects directly to the Tavily AI Search API via TavilyClient.
+# - Executes web search queries tailored for travel research, hotels, and attractions.
+# - Formats and truncates search results with clean titles, URLs, and markdown summaries.
+###############################################################################
 
 load_dotenv()
 

@@ -4,6 +4,17 @@ from datetime import datetime
 from langchain_core.messages import HumanMessage
 from main import app
 
+###############################################################################
+# Streamlit Interactive Web Application & Travel Concierge UI
+#
+# Functional Details:
+# - Provides an interactive, modern user interface for the AI Travel Booking System.
+# - Manages chat sessions, unique conversation thread IDs, and persistent state.
+# - Streams and renders multi-agent execution results (Flights, Hotels, Weather, Itinerary).
+# - Features real-time state inspection, node execution tracking, and markdown export/download.
+# - Connects directly to the compiled LangGraph execution graph for end-to-end trip planning.
+###############################################################################
+
 st.set_page_config(
     page_title="AI Travel Booking System",
     page_icon="✈️",

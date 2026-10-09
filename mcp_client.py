@@ -3,7 +3,22 @@ import sys
 import asyncio
 from pathlib import Path
 from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_groq import ChatGroq
 from settings import get_mcp_server_config, GROQ_DESTINATION_MODEL
+
+###############################################################################
+# MCP Client & Multi-Tool Adapter Integration
+#
+# Functional Details:
+# - Connects and manages communication across multiple Model Context Protocol (MCP) servers
+#   (Tavily Search, AviationStack Flights & Airlines, OpenWeather Custom Server).
+# - Discovers, initializes, and maps available MCP tools dynamically for agent use.
+# - Provides async wrapper functions for:
+#   * tavily_mcp_search: Performs live web intelligence and hotel/flight search.
+#   * aviation_mcp_call / get_airports / get_airlines: Fetches aviation data.
+#   * weather_mcp_search / forecast_mcp_search: Retrieves real-time weather & forecasts.
+# - Implements LLM-based destination entity extraction (extract_destination) from user travel prompts.
+###############################################################################
 
 client = MultiServerMCPClient(get_mcp_server_config())
 
@@ -37,10 +52,6 @@ async def initialize_mcp():
         if tool.name != "tavily_search"
     }
 
-
-
-
-
 async def tavily_mcp_search(query: str):
     await initialize_mcp()
     result = await search_tool.ainvoke(
@@ -49,7 +60,6 @@ async def tavily_mcp_search(query: str):
         }
     )
     return result
-
 
 
 # we will pass here one tool name(retrieved from aviation mcp server) and some args
@@ -144,10 +154,6 @@ async def forecast_mcp_search(city: str):
         }
     )
 
-
-
-
-from langchain_groq import ChatGroq
 
 # LLM
 llm = ChatGroq(

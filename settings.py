@@ -4,6 +4,17 @@ import shutil
 from pathlib import Path
 from dotenv import load_dotenv
 
+###############################################################################
+# Central Configuration & Environment Manager
+#
+# Functional Details:
+# - Loads and validates environment variables (.env file and Streamlit secrets).
+# - Resolves project directory paths, virtual environment binaries, and CLI commands.
+# - Manages API credentials (Tavily, AviationStack, OpenWeather, Groq, PostgreSQL).
+# - Configures LLM model names for planner and destination extractor agents.
+# - Generates dynamic server configurations for MultiServerMCPClient (Stdio and HTTP transports).
+###############################################################################
+
 # Define Project Base Directory
 PROJECT_ROOT = Path(__file__).resolve().parent
 

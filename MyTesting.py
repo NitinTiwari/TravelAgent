@@ -4,6 +4,15 @@ import asyncio
 from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
+###############################################################################
+# Multi-Server MCP Integration Test Suite
+#
+# Functional Details:
+# - Tests multi-server MCP client connectivity and tool registration.
+# - Verifies live tool calls across Tavily HTTP, AviationStack Stdio, and Weather Stdio servers.
+# - Validates tool invocation responses for airports, airlines, flight search, and weather forecasts.
+###############################################################################
+
 #load_dotenv()
 load_dotenv(override=True)
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
@@ -58,44 +67,3 @@ async def main():
         print(tool.name)
 
 asyncio.run(main()) 
-# if __name__ == "__main__":
-#     main()
-
-# async def main():
-#     tools = await client.get_tools()
-
-#     search_tool = next(
-#         tool
-#         for tool in tools
-#         if tool.name == "tavily_search"
-#     )
-
-#     result = await search_tool.ainvoke(
-#         {
-#             "query": "Best hotels in Delhi"
-#         }
-#     )
-
-#     print(result)
-
-# asyncio.run(main()) 
-
-
-# search_tool = None
-
-# async def initialize_mcp():
-#     global search_tool
-#     if search_tool is not None:
-#         return
-
-#     tools = await client.get_tools()
-#     print("\nAvailable MCP Tools:")
-
-#     for tool in tools:
-#         print(tool.name)
-
-#     search_tool = next(
-#         tool
-#         for tool in tools
-#         if tool.name == "tavily_search"
-#     )
