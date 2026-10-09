@@ -17,7 +17,7 @@ from r2_storage import upload_plan_to_r2, is_r2_configured
 ###############################################################################
 
 st.set_page_config(
-    page_title="AI Travel Booking System",
+    page_title="AI-Travel Booking System-NItin",
     page_icon="✈️",
     layout="wide"
 )
@@ -45,14 +45,31 @@ html, body, .stApp {
 }
 
 section[data-testid="stSidebar"] > div:first-child,
-section[data-testid="stSidebar"] .block-container {
-    padding-top: 0.8rem !important;
-    padding-bottom: 1rem !important;
+section[data-testid="stSidebar"] .block-container,
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.5rem !important;
+    padding-left: 0.9rem !important;
+    padding-right: 0.9rem !important;
 }
 
-/* ── Header & Sidebar Toggle Controls ── */
+section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+    gap: 0.3rem !important;
+}
+
+/* ── Header & Sidebar Toggle Controls (<< Button) ── */
 header[data-testid="stHeader"] {
     background: transparent !important;
+}
+
+[data-testid="stSidebarHeader"] {
+    padding-top: 0.1rem !important;
+    padding-bottom: 0rem !important;
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+    min-height: unset !important;
+    height: auto !important;
+    margin-bottom: 0rem !important;
 }
 
 [data-testid="collapsedControl"],
@@ -61,6 +78,9 @@ header[data-testid="stHeader"] {
     display: flex !important;
     color: #7ab8f5 !important;
     z-index: 999999 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 0 !important;
 }
 
 [data-testid="collapsedControl"] button,
@@ -68,7 +88,11 @@ header[data-testid="stHeader"] {
     background: #0e1a2b !important;
     color: #7ab8f5 !important;
     border: 1px solid #1e2e44 !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
+    padding: 0.15rem 0.4rem !important;
+    height: auto !important;
+    min-height: unset !important;
+    margin: 0 !important;
 }
 
 /* ── Hero ── */
@@ -79,13 +103,15 @@ header[data-testid="stHeader"] {
     margin-top: 0 !important;
     margin-bottom: 1.5rem;
     height: 270px;
+    border: 1px solid rgba(58,123,213,0.35);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 .hero-bg {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    filter: brightness(0.35);
+    filter: brightness(0.42) saturate(1.25);
     position: absolute;
     top: 0; left: 0;
 }
@@ -99,6 +125,7 @@ header[data-testid="stHeader"] {
     justify-content: center;
     text-align: center;
     padding: 2rem;
+    background: radial-gradient(circle, rgba(8,13,20,0.2) 0%, rgba(8,13,20,0.7) 100%);
 }
 .hero-badge {
     background: rgba(58,123,213,0.25);
@@ -160,16 +187,20 @@ header[data-testid="stHeader"] {
     cursor: pointer;
     transition: all 0.2s;
 }
-.dest-chip:hover { background: #1a2e47; border-color: #3a7bd5; color: #fff; }
+.dest-chip:hover { background: #1a2e44; border-color: #3a7bd5; color: #fff; }
 
 /* ── Generate button ── */
+div[data-testid="stButton"] {
+    display: flex;
+    justify-content: flex-start;
+}
 div[data-testid="stButton"] > button {
     background: linear-gradient(135deg, #1a6bbf 0%, #0d4a8a 50%, #0a3d75 100%) !important;
     color: #ffffff !important;
     border: none !important;
     border-radius: 12px !important;
-    padding: 0.85rem 2.5rem !important;
-    font-size: 1.05rem !important;
+    padding: 0.8rem 1.6rem !important;
+    font-size: 1rem !important;
     font-weight: 700 !important;
     letter-spacing: 0.03em !important;
     width: 100% !important;
@@ -271,8 +302,17 @@ section[data-testid="stSidebar"] {
     font-size: 0.83rem;
     color: #7aa8cc;
 }
-.sidebar-title { color: #e0edf8; font-size: 1.05rem; font-weight: 600; margin: 0.8rem 0 0.4rem; }
-.sidebar-title:first-of-type { margin-top: 0 !important; }
+.sidebar-header {
+    color: #e0edf8;
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.sidebar-title { color: #e0edf8; font-size: 1.05rem; font-weight: 600; margin: 0.8rem 0 0.4rem !important; }
 
 /* Hide branding */
 #MainMenu, footer { visibility: hidden !important; }
@@ -342,7 +382,10 @@ section[data-testid="stSidebar"] p,
 section[data-testid="stSidebar"] span,
 section[data-testid="stSidebar"] label,
 section[data-testid="stSidebar"] .stMarkdown { color: #a0c4e0 !important; }
-section[data-testid="stSidebar"] hr { border-color: #1a2e44 !important; }
+section[data-testid="stSidebar"] hr {
+    border-color: #1a2e44 !important;
+    margin: 0.35rem 0 0.65rem 0 !important;
+}
 
 /* Download button — light bg → dark text  */
 div[data-testid="stDownloadButton"] > button {
@@ -356,7 +399,7 @@ div[data-testid="stDownloadButton"] > button {
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("<div class='sidebar-title'>🌍 AI Travel Planner</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sidebar-header'>🌍 AI Travel Planner</div>", unsafe_allow_html=True)
     st.markdown("---")
 
     thread_id = st.text_input("👤 User ID", value="NitinTiwati_user",
@@ -367,15 +410,15 @@ with st.sidebar:
         st.markdown(f"<div class='sidebar-chip'>{tech}</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='sidebar-title'>Agent Pipeline</div>", unsafe_allow_html=True)
-    for step in ["① Flight Agent", "② Hotel Agent", "③ Itinerary Agent", "④ Final Agent"]:
+    for step in ["① ✈️ Flight Agent", "② 🏨 Hotel Agent", "③ 🌤️ Weather Agent", "④ 🗓️ Itinerary Agent"]:
         st.markdown(f"<div class='sidebar-chip'>{step}</div>", unsafe_allow_html=True)
 
 # ── Hero ──────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="hero-wrapper">
     <img class="hero-bg"
-         src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1400&q=80"
-         alt="airplane above clouds"/>
+         src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&q=85"
+         alt="Multi-Agent AI Global Network"/>
     <div class="hero-content">
         <div class="hero-badge">✦ Multi-Agent AI System</div>
         <div class="hero-title">✈️ AI Travel Booking System</div>
@@ -385,24 +428,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Destination image strip ───────────────────────────────────────────────────
-DESTINATIONS = [
-    ("🇯🇵 Tokyo",     "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=300&q=70"),
-    ("🇫🇷 Paris",     "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=300&q=70"),
-    ("🇹🇭 Bangkok",   "https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=300&q=70"),
-    ("🇮🇹 Rome",      "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300&q=70"),
-    ("🇦🇪 Dubai",     "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=300&q=70"),
-]
+# DESTINATIONS = [
+#     ("🇯🇵 Tokyo",     "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=300&q=70"),
+#     ("🇫🇷 Paris",     "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=300&q=70"),
+#     ("🇹🇭 Bangkok",   "https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=300&q=70"),
+#     ("🇮🇹 Rome",      "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=300&q=70"),
+#     ("🇦🇪 Dubai",     "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=300&q=70"),
+# ]
 
-cols = st.columns(5)
-for col, (name, img_url) in zip(cols, DESTINATIONS):
-    with col:
-        st.markdown(f"""
-        <div style="border-radius:10px;overflow:hidden;position:relative;height:90px;cursor:pointer;">
-            <img src="{img_url}" style="width:100%;height:100%;object-fit:cover;filter:brightness(0.55);" />
-            <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;
-                        color:#fff;font-size:0.8rem;font-weight:600;">{name}</div>
-        </div>
-        """, unsafe_allow_html=True)
+# cols = st.columns(5)
+# for col, (name, img_url) in zip(cols, DESTINATIONS):
+#     with col:
+#         st.markdown(f"""
+#         <div style="border-radius:10px;overflow:hidden;position:relative;height:90px;cursor:pointer;">
+#             <img src="{img_url}" style="width:100%;height:100%;object-fit:cover;filter:brightness(0.55);" />
+#             <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;
+#                         color:#fff;font-size:0.8rem;font-weight:600;">{name}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -425,7 +468,9 @@ user_query = st.text_area(
     label_visibility="collapsed",
 )
 
-generate = st.button("🚀  Generate My Travel Plan", use_container_width=True)
+btn_col, _ = st.columns([1, 2])
+with btn_col:
+    generate = st.button("🚀  Generate My Travel Plan", use_container_width=True)
 
 # ── Agent pipeline ────────────────────────────────────────────────────────────
 AGENT_META = {

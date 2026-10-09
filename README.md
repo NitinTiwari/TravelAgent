@@ -6,22 +6,231 @@ An intelligent, production-ready multi-agent travel concierge powered by **LangG
 
 ## 🌟 Overview & Architecture
 
-The application coordinates multiple specialized AI agents in a stateful directed acyclic graph (DAG) to generate complete, personalized travel itineraries. Each agent has a specific role and accesses data through specialized MCP (Model Context Protocol) servers.
+The application coordinates multiple specialized AI agents in a stateful directed acyclic graph (DAG) powered by **LangGraph** to generate complete, personalized travel itineraries. Each agent has a specialized role and dynamically queries external tools through the **Model Context Protocol (MCP)** standard.
+
+---
+
+## 📊 Graphical Data Flow
+
+The following graphical diagrams illustrate the complete end-to-end data flow, multi-agent pipeline, MCP tool integration, and state persistence lifecycle.
+
+### 1. End-to-End System & Data Flow Architecture
 
 ```mermaid
-graph LR
-    START([Start / User Prompt]) --> FlightAgent[✈️ Flight Agent\n(Aviationstack MCP)]
-    FlightAgent --> HotelAgent[🏨 Hotel Agent\n(Tavily Search MCP)]
-    HotelAgent --> WeatherAgent[☀️ Weather Agent\n(OpenWeather FastMCP)]
-    WeatherAgent --> ItineraryAgent[📋 Itinerary Planner\n(Groq LLM)]
-    ItineraryAgent --> END([Complete Travel Itinerary])
+flowchart TD
+    %% Styling
+    classDef client fill:#0e1a2b,stroke:#3a7bd5,stroke-width:2px,color:#e0edf8;
+    classDef memory fill:#142236,stroke:#f59e0b,stroke-width:2px,color:#fef3c7;
+    classDef agent fill:#0f2744,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef mcp fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#e0e7ff;
+    classDef llm fill:#2e1065,stroke:#c084fc,stroke-width:2px,color:#f3e8ff;
+    classDef storage fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5;
+
+    subgraph UI ["🖥️ User Interface & Entry Points"]
+        User(["👤 User"]):::client
+        StreamlitApp["🌐 Streamlit Web UI (frontend.py)\n• Live agent streaming\n• Thread ID session tracking\n• Export & download cards"]:::client
+        CLIApp["💻 CLI Runner (main.py)\n• Terminal execution"]:::client
+        User -->|Submit travel prompt & budget| StreamlitApp
+        User -->|Run travel query| CLIApp
+    end
+
+    subgraph Engine ["⚡ LangGraph State Engine & Persistence"]
+        GraphRunner["🔄 LangGraph StateGraph (app.invoke / app.stream)\nState Schema: TravelState"]:::memory
+        Checkpointer[("🐘 PostgreSQL Checkpointer\n(PostgresSaver ConnectionPool / Neon)\n↳ Fallback: In-Memory MemorySaver")]:::memory
+        StreamlitApp -->|Invoke with thread_id| GraphRunner
+        CLIApp -->|Invoke with thread_id| GraphRunner
+        GraphRunner <-->|Read / Write checkpoint state| Checkpointer
+    end
+
+    subgraph Pipeline ["🤖 Sequential Multi-Agent Data Pipeline"]
+        direction TB
+
+        %% Flight Agent Node
+        subgraph Step1 ["1️⃣ Flight Agent (flight_agent)"]
+            direction TB
+            FA["✈️ Flight Agent Node"]:::agent
+            MCPClient1["🔌 MultiServerMCPClient"]:::mcp
+            AvMCP["Aviationstack MCP Server\n(stdio transport)\n• list_airports\n• list_airlines"]:::mcp
+            AvAPI["🌐 Aviationstack REST API"]:::mcp
+            GroqFA["🧠 Groq LLM\n(Flight Reasoning)"]:::llm
+
+            FA -->|1. Request flight tools| MCPClient1
+            MCPClient1 -->|2. Execute stdio MCP tool| AvMCP
+            AvMCP -->|3. Fetch live data| AvAPI
+            AvAPI -.->|4. Airport/Airline metadata| FA
+            FA -->|5. Format prompt + metadata| GroqFA
+            GroqFA -.->|6. Return flight guidance| FA
+        end
+
+        %% Hotel Agent Node
+        subgraph Step2 ["2️⃣ Hotel Agent (hotel_agent)"]
+            direction TB
+            HA["🏨 Hotel Agent Node"]:::agent
+            MCPClient2["🔌 MultiServerMCPClient / HTTP"]:::mcp
+            TavMCP["Tavily Search MCP\n(Streamable HTTP / Fallback)\n• tavily_search"]:::mcp
+            GroqHA["🧠 Groq LLM\n(Accommodation Synthesis)"]:::llm
+
+            HA -->|1. Search query: Best hotels| MCPClient2
+            MCPClient2 -->|2. HTTP POST query| TavMCP
+            TavMCP -.->|3. Hotel listings & URLs| HA
+            HA -->|4. Structure hotel recommendations| GroqHA
+            GroqHA -.->|5. Return categorized hotel guide| HA
+        end
+
+        %% Weather Agent Node
+        subgraph Step3 ["3️⃣ Weather Agent (weather_agent)"]
+            direction TB
+            WA["🌤️ Weather Agent Node"]:::agent
+            GroqWA["🧠 Groq LLM\n(Destination Extractor)"]:::llm
+            FastMCP["OpenWeather FastMCP Server\n(stdio transport)\n• get_current_weather\n• get_forecast"]:::mcp
+            OWAPI["🌐 OpenWeatherMap API"]:::mcp
+
+            WA -->|1. Prompt: Extract destination| GroqWA
+            GroqWA -.->|2. Extracted city name| WA
+            WA -->|3. Call MCP weather & forecast| FastMCP
+            FastMCP -->|4. HTTP REST query| OWAPI
+            OWAPI -.->|5. Current temp & 5-day forecast| WA
+        end
+
+        %% Itinerary Agent Node
+        subgraph Step4 ["4️⃣ Itinerary Agent (itinerary_agent)"]
+            direction TB
+            IA["🗓️ Itinerary Planner Node"]:::agent
+            GroqIA["🧠 Groq LLM\n(Synthesis & Master Itinerary)"]:::llm
+
+            IA -->|Synthesize flight + hotel + weather + user query| GroqIA
+            GroqIA -.->|Return complete day-by-day itinerary| IA
+        end
+
+        %% Flow between steps
+        Step1 ==>|Update TravelState:\nflight_results| Step2
+        Step2 ==>|Update TravelState:\nhotel_results| Step3
+        Step3 ==>|Update TravelState:\nweather_results| Step4
+    end
+
+    GraphRunner --> Step1
+    Step4 --> OutputDelivery
+
+    subgraph OutputDelivery ["📦 Outputs, Exports & Storage"]
+        direction TB
+        StreamlitRender["🖥️ Real-time UI Cards & Metrics\n(Agents Run, LLM Calls, Cost Status)"]:::client
+        LocalMD["📁 Local Markdown File\n(travel_plans/travel_plan_<timestamp>.md)"]:::storage
+        CloudR2["☁️ Cloudflare R2 Object Storage\n(upload_plan_to_r2)"]:::storage
+
+        OutputDeliveryNode["Complete Itinerary Ready"] --> StreamlitRender
+        StreamlitRender --> LocalMD
+        StreamlitRender --> CloudR2
+    end
 ```
+
+---
+
+### 2. Request & Execution Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 👤 User
+    participant UI as 🖥️ Streamlit UI / CLI
+    participant LG as ⚡ LangGraph Engine
+    participant DB as 🐘 PostgreSQL Checkpointer
+    participant FA as ✈️ Flight Agent
+    participant HA as 🏨 Hotel Agent
+    participant WA as 🌤️ Weather Agent
+    participant IA as 🗓️ Itinerary Agent
+    participant MCP as 🔌 MCP Servers (Aviation / Tavily / Weather)
+    participant LLM as 🧠 Groq Cloud LLM
+    participant Storage as ☁️ Storage (Local / Cloudflare R2)
+
+    User->>UI: Enter travel request & thread_id
+    UI->>LG: app.stream(initial TravelState, config={"thread_id": id})
+    LG->>DB: Save initial checkpoint
+
+    %% Flight Agent
+    rect rgb(14, 26, 43)
+        Note over LG,FA: Step 1: Flight Discovery & Estimation
+        LG->>FA: Invoke flight_agent(state)
+        FA->>MCP: list_airports() & list_airlines() (Aviationstack MCP stdio)
+        MCP-->>FA: Return airports & airlines JSON
+        FA->>LLM: Prompt with flight metadata + user request
+        LLM-->>FA: Flight options, estimated fares & route advice
+        FA-->>LG: Return {flight_results, messages, llm_calls: +1}
+        LG->>DB: Save checkpoint (flight_agent completed)
+        LG-->>UI: Stream flight_results to status card
+    end
+
+    %% Hotel Agent
+    rect rgb(20, 34, 54)
+        Note over LG,HA: Step 2: Accommodation & Hotel Search
+        LG->>HA: Invoke hotel_agent(state)
+        HA->>MCP: tavily_search("Best hotels for <destination>")
+        MCP-->>HA: Return web search hotel candidates
+        HA->>LLM: Prompt with hotel search data + user budget
+        LLM-->>HA: Curated hotel tiers (Budget/Mid/Luxury) & locations
+        HA-->>LG: Return {hotel_results, messages, llm_calls: +1}
+        LG->>DB: Save checkpoint (hotel_agent completed)
+        LG-->>UI: Stream hotel_results to status card
+    end
+
+    %% Weather Agent
+    rect rgb(15, 39, 68)
+        Note over LG,WA: Step 3: Destination Extraction & Live Weather
+        LG->>WA: Invoke weather_agent(state)
+        WA->>LLM: extract_destination(user_query)
+        LLM-->>WA: Return extracted destination city (e.g. "Varanasi")
+        WA->>MCP: get_current_weather(city) & get_forecast(city)
+        MCP-->>WA: Return current temperature, conditions & 5-day forecast
+        WA-->>LG: Return {weather_results, messages}
+        LG->>DB: Save checkpoint (weather_agent completed)
+        LG-->>UI: Stream weather_results to status card
+    end
+
+    %% Itinerary Agent
+    rect rgb(46, 16, 101)
+        Note over LG,IA: Step 4: Master Itinerary Synthesis
+        LG->>IA: Invoke itinerary_agent(state)
+        IA->>LLM: Prompt with full aggregated state (flights + hotels + weather + query)
+        LLM-->>IA: Synthesized day-by-day travel plan & booking tips
+        IA-->>LG: Return {itinerary, messages, llm_calls: +1}
+        LG->>DB: Save final graph checkpoint
+        LG-->>UI: Stream final itinerary
+    end
+
+    %% Output & Storage
+    rect rgb(6, 78, 59)
+        Note over UI,Storage: Step 5: Rendering, Export & Cloud Persistence
+        UI->>UI: Render metrics, itinerary markdown card & download button
+        UI->>Storage: Save travel_plan_<timestamp>.md to travel_plans/
+        opt Cloudflare R2 Enabled
+            UI->>Storage: upload_plan_to_r2(filename, content)
+        end
+        UI-->>User: Display complete interactive itinerary
+    end
+```
+
+---
+
+### 3. State Schema (`TravelState`) Data Lifecycle
+
+The graph shares a centralized `TravelState` TypedDict that accumulates agent outputs incrementally:
+
+| State Key | Type | Description | Producer Node |
+| :--- | :--- | :--- | :--- |
+| `user_query` | `str` | Original user travel prompt and constraints | Entry / User Input |
+| `messages` | `Annotated[list, operator.add]` | Chronological chat and status message history | All Agents |
+| `flight_results` | `str` | Airport routes, flight durations, airfares, booking tips | `flight_agent` |
+| `hotel_results` | `str` | Categorized hotel options (Budget/Mid/Luxury) & areas | `hotel_agent` |
+| `weather_results` | `str` | Current weather conditions and 5-day forecast | `weather_agent` |
+| `itinerary` | `str` | Complete day-by-day synthesized travel plan | `itinerary_agent` |
+| `llm_calls` | `int` | Counter tracking total LLM inference calls | All Agent Nodes |
+
+---
 
 ### 🤖 Specialized Agents & Workflow
 
 1. **Flight Agent (`flight_agent`)**:
    - Acts as the first step in the pipeline.
-   - Queries real-time airline and airport metadata through the **Aviationstack MCP Server**.
+   - Queries real-time airline and airport metadata through the **Aviationstack MCP Server** (`stdio` transport).
    - Identifies likely departure/arrival airports, active routes, flight durations, airfare estimates, and provides peak season pricing advice.
 2. **Hotel Agent (`hotel_agent`)**:
    - Takes the user query and searches for the best accommodations.
