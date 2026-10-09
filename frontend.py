@@ -3,6 +3,7 @@ import streamlit as st
 from datetime import datetime
 from langchain_core.messages import HumanMessage
 from main import app
+from r2_storage import upload_plan_to_r2, is_r2_configured
 
 ###############################################################################
 # Streamlit Interactive Web Application & Travel Concierge UI
@@ -362,7 +363,7 @@ with st.sidebar:
                               help="Your session ID — keeps travel history across queries")
 
     st.markdown("<div class='sidebar-title'>Powered by</div>", unsafe_allow_html=True)
-    for tech in ["🔗 LangGraph", "🧠 Groq · LLaMA 3.3 70B", "🐘 PostgreSQL", "🔍 Tavily Search", "✈️ AviationStack"]:
+    for tech in ["🔗 LangGraph", "🧠 Groq · LLaMA 3.3 70B", "🐘 PostgreSQL", "☁️ Cloudflare R2", "🔍 Tavily Search", "✈️ AviationStack"]:
         st.markdown(f"<div class='sidebar-chip'>{tech}</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='sidebar-title'>Agent Pipeline</div>", unsafe_allow_html=True)
@@ -545,8 +546,14 @@ if generate:
 ---
 *LLM Calls: {collected['llm_calls']}*
 """
+        # Save locally
         with open(os.path.join(save_dir, filename), "w", encoding="utf-8") as f:
             f.write(file_content)
+
+        # Upload to Cloudflare R2 Object Storage
+        r2_status = None
+        if is_r2_configured():
+            r2_status = upload_plan_to_r2(filename, file_content)
 
         dl_col, info_col = st.columns([1, 3])
         with dl_col:
@@ -554,5 +561,13 @@ if generate:
                                file_name=filename, mime="text/markdown",
                                use_container_width=True)
         with info_col:
-            st.markdown(f"<div class='save-bar'>📁 Auto-saved → <code>travel_plans/{filename}</code></div>",
-                        unsafe_allow_html=True)
+            if r2_status and r2_status.get("success"):
+                st.markdown(
+                    f"<div class='save-bar'>☁️ Saved to Cloudflare R2 → <code>{r2_status['key']}</code></div>",
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f"<div class='save-bar'>📁 Auto-saved → <code>travel_plans/{filename}</code></div>",
+                    unsafe_allow_html=True
+                )

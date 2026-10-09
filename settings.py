@@ -66,6 +66,12 @@ LANGCHAIN_PROJECT = get_config_val("LANGCHAIN_PROJECT", "Multi-Agent-Travel-MCP"
 # PostgreSQL Database Connection URL for LangGraph Checkpointer
 DATABASE_URL = get_config_val("DATABASE_URL", "")
 
+# Cloudflare R2 Object Storage Configuration
+R2_ACCOUNT_ID = get_config_val("R2_ACCOUNT_ID") or get_config_val("CLOUDFLARE_R2_ACCOUNT_ID") or ""
+R2_ACCESS_KEY_ID = get_config_val("R2_ACCESS_KEY_ID") or get_config_val("CLOUDFLARE_R2_ACCESS_KEY_ID") or ""
+R2_SECRET_ACCESS_KEY = get_config_val("R2_SECRET_ACCESS_KEY") or get_config_val("CLOUDFLARE_R2_SECRET_ACCESS_KEY") or ""
+R2_BUCKET_NAME = get_config_val("R2_BUCKET_NAME") or get_config_val("CLOUDFLARE_R2_BUCKET_NAME") or "travel-plans"
+
 # ==========================================
 # 🤖 LLM Models Configuration
 # ==========================================
@@ -137,6 +143,7 @@ def validate_settings():
         "OPENWEATHER_API_KEY": "[OK] Set" if OPENWEATHER_API_KEY else "[MISSING]",
         "GROQ_API_KEY": "[OK] Set" if GROQ_API_KEY else "[MISSING]",
         "DATABASE_URL": "[OK] Set" if DATABASE_URL else "[MISSING]",
+        "Cloudflare R2": "[OK] Configured" if (R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY) else "[NOT CONFIGURED]",
         "Aviationstack Exe Exists": "[OK] Yes" if AVIATIONSTACK_EXE_PATH.exists() else "[WARN] No (using fallback)",
         "Weather Script Exists": "[OK] Yes" if WEATHER_MCP_SERVER_SCRIPT.exists() else "[MISSING]",
     }
