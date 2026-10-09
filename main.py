@@ -91,6 +91,40 @@ Return concise travel guidance.
 """
 
 
+def prune_aviation_data(raw_data, query: str, max_items: int = 5) -> str:
+    """
+    Lightweight deterministic filter that extracts only relevant airports/airlines
+    matching query keywords, eliminating thousands of irrelevant context tokens.
+    """
+    if not raw_data:
+        return "No flight metadata available."
+
+    import json
+    import re
+    query_words = set(w.lower() for w in re.findall(r'\b\w+\b', query) if len(w) > 3)
+
+    items = []
+    if isinstance(raw_data, list):
+        items = raw_data
+    elif isinstance(raw_data, dict) and "data" in raw_data and isinstance(raw_data["data"], list):
+        items = raw_data["data"]
+    elif isinstance(raw_data, dict):
+        items = [raw_data]
+
+    if items and isinstance(items[0], dict):
+        matched = []
+        for item in items:
+            item_text = " ".join(str(v).lower() for v in item.values())
+            if any(w in item_text for w in query_words):
+                matched.append(item)
+
+        if matched:
+            return json.dumps(matched[:max_items], indent=2)
+        # Fallback to compact sample
+        return json.dumps(items[:max_items], indent=2)
+
+    return str(raw_data)[:1200]
+
 
 # Flight Agent
 def flight_agent(state: TravelState):
@@ -112,13 +146,17 @@ def flight_agent(state: TravelState):
             )
         )
 
+        # Deterministically prune irrelevant global airports/airlines before LLM invocation
+        pruned_airports = prune_aviation_data(airports, query)
+        pruned_airlines = prune_aviation_data(airlines, query)
+
         prompt = FLIGHT_AGENT_PROMPT.format(
             query=query,
-            airport_data=str(airports)[:3000],
-            airline_data=str(airlines)[:3000]
+            airport_data=pruned_airports,
+            airline_data=pruned_airlines
         )
 
-        logger.debug("[flight_agent] Invoking Groq LLM for flight estimation")
+        logger.info(f"🧠 [FETCHED_FROM_LLM_CALL] Invoking Groq LLM ({GROQ_PLANNER_MODEL}) for flight estimation & route analysis")
         response = llm.invoke([
             SystemMessage(
                 content="You are an expert travel flight planner."
@@ -246,7 +284,7 @@ def hotel_agent(state: TravelState):
 
     # Pass through LLM to generate structured, human-readable hotel advice
     try:
-        logger.debug("[hotel_agent] Invoking Groq LLM for hotel categorization")
+        logger.info(f"🧠 [FETCHED_FROM_LLM_CALL] Invoking Groq LLM ({GROQ_PLANNER_MODEL}) for hotel categorization & tier structuring")
         prompt = HOTEL_AGENT_PROMPT.format(
             query=state["user_query"],
             hotel_search_data=search_summary
@@ -273,17 +311,15 @@ def hotel_agent(state: TravelState):
 def weather_agent(state: TravelState):
     logger.info("🌤️ [weather_agent] Node started")
     city = extract_destination(state["user_query"])
-    logger.info(f"📍 [weather_agent] Extracted destination city: {city}")
+    logger.info(f"📍 [weather_agent] Working with destination: {city}")
 
     try:
-        logger.debug(f"[weather_agent] Fetching current weather for: {city}")
         weather_data = asyncio.run(weather_mcp_search(city))
     except Exception as e:
         weather_data = f"Current weather unavailable: {e}"
         logger.error(f"[weather_agent] Current weather error: {e}", exc_info=True)
 
     try:
-        logger.debug(f"[weather_agent] Fetching 5-day forecast for: {city}")
         forecast_data = asyncio.run(forecast_mcp_search(city))
     except Exception as e:
         forecast_data = f"Forecast unavailable: {e}"
@@ -296,7 +332,7 @@ def weather_agent(state: TravelState):
 - **5-Day Weather Forecast**:
 {forecast_data}
 """
-    logger.info("✅ [weather_agent] Weather data retrieved successfully")
+    logger.info("✅ [weather_agent] Weather data ready")
 
     return {
         "weather_results": formatted_weather,
@@ -326,7 +362,7 @@ def itinerary_agent(state: TravelState):
     """
 
     try:
-        logger.debug("[itinerary_agent] Invoking Groq LLM for master itinerary synthesis")
+        logger.info(f"🧠 [FETCHED_FROM_LLM_CALL] Invoking Groq LLM ({GROQ_PLANNER_MODEL}) for master itinerary synthesis")
         response = llm.invoke([
             SystemMessage(
                 content="You are an expert travel planner"

@@ -54,6 +54,8 @@ def get_logger(name: str = "TravelSystem") -> logging.Logger:
 def setup_session_logger(thread_id: str = "default") -> tuple[logging.Logger, str]:
     """
     Sets up a dedicated per-session log file for an individual travel planning run.
+    Attaches the session file handler to the global TravelSystem logger so all MCP client
+    caching logs, agent node logs, and LLM call logs are saved in the per-session log file.
     Returns: (session_logger, log_filepath)
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -77,9 +79,22 @@ def setup_session_logger(thread_id: str = "default") -> tuple[logging.Logger, st
     sch.setFormatter(formatter)
     session_logger.addHandler(sch)
 
+    # Also attach the session file handler to TravelSystem so all MCP & Agent logs are captured in this file
+    travel_system_logger = logging.getLogger("TravelSystem")
+    for h in list(travel_system_logger.handlers):
+        if getattr(h, "_is_session_handler", False):
+            travel_system_logger.removeHandler(h)
+            try:
+                h.close()
+            except Exception:
+                pass
+    sfh._is_session_handler = True
+    travel_system_logger.addHandler(sfh)
+
     session_logger.info("=" * 70)
     session_logger.info(f"🚀 TRAVEL PLANNING SESSION STARTED | Thread ID: {thread_id}")
     session_logger.info(f"📁 Session Log File: {log_filepath}")
     session_logger.info("=" * 70)
 
     return session_logger, log_filepath
+

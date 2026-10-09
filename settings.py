@@ -79,6 +79,14 @@ GROQ_PLANNER_MODEL = get_config_val("GROQ_PLANNER_MODEL", "openai/gpt-oss-20b")
 GROQ_DESTINATION_MODEL = get_config_val("GROQ_DESTINATION_MODEL", "openai/gpt-oss-20b")
 
 # ==========================================
+# ⚡ Semantic Cache TTL Settings (Seconds)
+# ==========================================
+TTL_WEATHER_CURRENT = int(get_config_val("TTL_WEATHER_CURRENT", "3600"))       # 1 Hour
+TTL_WEATHER_FORECAST = int(get_config_val("TTL_WEATHER_FORECAST", "7200"))     # 2 Hours
+TTL_AVIATION_METADATA = int(get_config_val("TTL_AVIATION_METADATA", "86400")) # 24 Hours
+TTL_HOTEL_SEARCH = int(get_config_val("TTL_HOTEL_SEARCH", "21600"))           # 6 Hours
+
+# ==========================================
 # 🔌 MCP (Model Context Protocol) Server Paths
 # ==========================================
 AVIATIONSTACK_DIR = PROJECT_ROOT / "aviationstack-mcp"
