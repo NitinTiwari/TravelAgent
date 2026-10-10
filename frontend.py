@@ -411,7 +411,7 @@ with st.sidebar:
         st.markdown(f"<div class='sidebar-chip'>{tech}</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='sidebar-title'>Agent Pipeline</div>", unsafe_allow_html=True)
-    for step in ["① ✈️ Flight Agent", "② 🏨 Hotel Agent", "③ 🌤️ Weather Agent", "④ 🗓️ Itinerary Agent"]:
+    for step in ["⓪ 🛡️ Input Guardrail", "① ✈️ Flight Agent", "② 🏨 Hotel Agent", "③ 🌤️ Weather Agent", "④ 🗓️ Itinerary Agent"]:
         st.markdown(f"<div class='sidebar-chip'>{step}</div>", unsafe_allow_html=True)
 
 # ── Hero ──────────────────────────────────────────────────────────────────────
@@ -475,6 +475,7 @@ with btn_col:
 
 # ── Agent pipeline ────────────────────────────────────────────────────────────
 AGENT_META = {
+    "input_guardrail": ("🛡️", "Security & Domain Guardrail"),
     "flight_agent":    ("✈️", "Flight Agent"),
     "hotel_agent":     ("🏨", "Hotel Agent"),
     "weather_agent":   ("🌤️", "Weather Agent"),
@@ -498,6 +499,8 @@ if generate:
             "itinerary": "",
             "final_response": "",
             "llm_calls": 0,
+            "is_blocked": False,
+            "guardrail_status": "",
         }
         agents_run = 0
 
@@ -515,6 +518,8 @@ if generate:
                     "weather_results": "",
                     "itinerary": "",
                     "llm_calls": 0,
+                    "is_blocked": False,
+                    "guardrail_status": "",
                 },
                 config=config,
                 stream_mode="updates",
@@ -525,7 +530,19 @@ if generate:
                     session_logger.info(f"Node execution completed: {node_name}")
 
                     with st.status(f"{icon}  {label}", state="complete", expanded=True):
-                        if node_name == "flight_agent":
+                        if node_name == "input_guardrail":
+                            is_blocked = state_update.get("is_blocked", False)
+                            status_txt = state_update.get("guardrail_status", "")
+                            collected["is_blocked"] = is_blocked
+                            collected["guardrail_status"] = status_txt
+                            if is_blocked:
+                                st.error(f"🚫 {status_txt}")
+                                collected["itinerary"] = state_update.get("itinerary", "")
+                                collected["final_response"] = state_update.get("itinerary", "")
+                            else:
+                                st.success(f"✅ {status_txt}")
+
+                        elif node_name == "flight_agent":
                             text = state_update.get("flight_results", "")
                             collected["flight_results"] = text
                             st.markdown(text or "_No flight data returned._")
@@ -553,29 +570,45 @@ if generate:
             st.error(f"⚠️ An error occurred during plan generation: {stream_err}")
 
         # Metrics
+        status_label = "🚫 Blocked" if collected.get("is_blocked") else "✅ Success"
         st.markdown(f"""
         <div class="metric-row">
             <div class="metric-box"><div class="metric-val">{agents_run}</div><div class="metric-lbl">Agents Run</div></div>
             <div class="metric-box"><div class="metric-val">{collected['llm_calls']}</div><div class="metric-lbl">LLM Calls</div></div>
-            <div class="metric-box"><div class="metric-val">✅</div><div class="metric-lbl">Status</div></div>
+            <div class="metric-box"><div class="metric-val">{status_label}</div><div class="metric-lbl">Pipeline Status</div></div>
         </div>
         """, unsafe_allow_html=True)
 
         # Final plan card
         final_text = collected["final_response"] or collected["itinerary"]
         if final_text:
-            st.markdown("<div class='sec-head'><span>🧠 Final Travel Plan</span></div>",
+            header_title = "🛡️ Security & Guardrail Notice" if collected.get("is_blocked") else "🧠 Final Travel Plan"
+            st.markdown(f"<div class='sec-head'><span>{header_title}</span></div>",
                         unsafe_allow_html=True)
             st.markdown(f"<div class='final-card'>{final_text}</div>",
                         unsafe_allow_html=True)
 
-        # Save
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"travel_plan_{timestamp}.md"
-        save_dir = os.path.join(os.path.dirname(__file__), "travel_plans")
-        os.makedirs(save_dir, exist_ok=True)
+        # Read session log content for download
+        log_content = ""
+        if os.path.exists(session_log_path):
+            with open(session_log_path, "r", encoding="utf-8") as lf:
+                log_content = lf.read()
 
-        file_content = f"""# Travel Plan
+        # If blocked by guardrail, do not save invalid travel plans to disk or R2
+        if collected.get("is_blocked"):
+            session_logger.info("Session complete (Query blocked by guardrails).")
+            st.warning("⚠️ Request was blocked by security guardrails. No travel plan was saved to storage.")
+            st.download_button("📜 Download Security Log (.log)", data=log_content,
+                               file_name=os.path.basename(session_log_path),
+                               mime="text/plain", use_container_width=True)
+        else:
+            # Save valid plan
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"travel_plan_{timestamp}.md"
+            save_dir = os.path.join(os.path.dirname(__file__), "travel_plans")
+            os.makedirs(save_dir, exist_ok=True)
+
+            file_content = f"""# Travel Plan
 **Query:** {user_query}
 **Generated:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **User ID:** {thread_id}
@@ -603,42 +636,36 @@ if generate:
 ---
 *LLM Calls: {collected['llm_calls']}*
 """
-        # Save locally
-        with open(os.path.join(save_dir, filename), "w", encoding="utf-8") as f:
-            f.write(file_content)
-        session_logger.info(f"Saved travel plan to {os.path.join(save_dir, filename)}")
+            # Save locally
+            with open(os.path.join(save_dir, filename), "w", encoding="utf-8") as f:
+                f.write(file_content)
+            session_logger.info(f"Saved travel plan to {os.path.join(save_dir, filename)}")
 
-        # Upload to Cloudflare R2 Object Storage
-        r2_status = None
-        if is_r2_configured():
-            r2_status = upload_plan_to_r2(filename, file_content)
-            session_logger.info(f"Cloudflare R2 upload result: {r2_status}")
+            # Upload to Cloudflare R2 Object Storage
+            r2_status = None
+            if is_r2_configured():
+                r2_status = upload_plan_to_r2(filename, file_content)
+                session_logger.info(f"Cloudflare R2 upload result: {r2_status}")
 
-        session_logger.info("Session complete.")
+            session_logger.info("Session complete.")
 
-        # Read session log content for download
-        log_content = ""
-        if os.path.exists(session_log_path):
-            with open(session_log_path, "r", encoding="utf-8") as lf:
-                log_content = lf.read()
-
-        dl_col1, dl_col2, info_col = st.columns([1.2, 1.2, 2.6])
-        with dl_col1:
-            st.download_button("⬇️ Download Plan (.md)", data=file_content,
-                               file_name=filename, mime="text/markdown",
-                               use_container_width=True)
-        with dl_col2:
-            st.download_button("📜 Download Log (.log)", data=log_content,
-                               file_name=os.path.basename(session_log_path),
-                               mime="text/plain", use_container_width=True)
-        with info_col:
-            if r2_status and r2_status.get("success"):
-                st.markdown(
-                    f"<div class='save-bar'>☁️ Saved to R2 → <code>{r2_status['key']}</code><br>📄 Log → <code>{os.path.basename(session_log_path)}</code></div>",
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f"<div class='save-bar'>📁 Saved → <code>travel_plans/{filename}</code><br>📄 Log → <code>logs/{os.path.basename(session_log_path)}</code></div>",
-                    unsafe_allow_html=True
-                )
+            dl_col1, dl_col2, info_col = st.columns([1.2, 1.2, 2.6])
+            with dl_col1:
+                st.download_button("⬇️ Download Plan (.md)", data=file_content,
+                                   file_name=filename, mime="text/markdown",
+                                   use_container_width=True)
+            with dl_col2:
+                st.download_button("📜 Download Log (.log)", data=log_content,
+                                   file_name=os.path.basename(session_log_path),
+                                   mime="text/plain", use_container_width=True)
+            with info_col:
+                if r2_status and r2_status.get("success"):
+                    st.markdown(
+                        f"<div class='save-bar'>☁️ Saved to R2 → <code>{r2_status['key']}</code><br>📄 Log → <code>{os.path.basename(session_log_path)}</code></div>",
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown(
+                        f"<div class='save-bar'>📁 Saved → <code>travel_plans/{filename}</code><br>📄 Log → <code>logs/{os.path.basename(session_log_path)}</code></div>",
+                        unsafe_allow_html=True
+                    )

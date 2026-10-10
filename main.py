@@ -32,12 +32,14 @@ from mcp_client import (
 )
 from logger import logger, setup_session_logger
 from settings import DATABASE_URL, GROQ_PLANNER_MODEL, TAVILY_API_KEY
+from guardrails import validate_input_guardrail, sanitize_output
 
 ###############################################################################
 # LangGraph Multi-Agent Travel Planning Workflow & PostgreSQL Memory Checkpointer
 #
 # Functional Details:
 # - Orchestrates a sequential multi-agent travel concierge pipeline:
+#     0. input_guardrail: Enforces PII masking, Prompt Injection defense, and Domain safety.
 #     1. flight_agent: Queries airport & flight data via AviationStack MCP and Tavily fallback.
 #     2. hotel_agent: Gathers accommodation recommendations and pricing via Tavily MCP.
 #     3. weather_agent: Retrieves current weather & multi-day forecasts via OpenWeather MCP.
@@ -62,6 +64,8 @@ class TravelState(TypedDict):
     itinerary: str
     llm_calls: int
     weather_results: str
+    is_blocked: bool
+    guardrail_status: str
 
 
 # Flight Tool Router Prompt
@@ -342,6 +346,42 @@ def weather_agent(state: TravelState):
     }
 
 
+# Input Guardrail Node
+def input_guardrail_node(state: TravelState):
+    logger.info("🛡️ [input_guardrail] Node started - Validating input safety, PII, and topic alignment")
+    query = state.get("user_query", "")
+    guard_res = validate_input_guardrail(query)
+
+    if not guard_res["is_valid"]:
+        logger.warning(f"🚫 [input_guardrail] Blocked query: {guard_res['block_reason']}")
+        block_msg = f"🛡️ **Travel Security & Domain Guardrail Notice**:\n\n{guard_res['block_reason']}"
+        return {
+            "is_blocked": True,
+            "guardrail_status": f"Blocked: {guard_res['block_reason']}",
+            "itinerary": block_msg,
+            "messages": [AIMessage(content=block_msg)],
+        }
+
+    pii_note = f" (Redacted PII: {', '.join(guard_res['pii_redacted'])})" if guard_res["pii_redacted"] else ""
+    status_msg = f"Passed security and domain verification{pii_note}"
+    logger.info(f"✅ [input_guardrail] Input approved{pii_note}")
+
+    return {
+        "user_query": guard_res["sanitized_query"],
+        "is_blocked": False,
+        "guardrail_status": status_msg,
+        "messages": [AIMessage(content=f"Guardrail Check: {status_msg}")],
+    }
+
+
+def guardrail_router(state: TravelState) -> str:
+    """Conditional edge router: short-circuit to END if blocked, else proceed to flight_agent."""
+    if state.get("is_blocked", False):
+        logger.info("🛑 [guardrail_router] Routing directly to END (Query blocked by guardrails)")
+        return END
+    return "flight_agent"
+
+
 # Itinerary Agent
 def itinerary_agent(state: TravelState):
     logger.info("🗓️ [itinerary_agent] Node started - Final Master Plan Synthesis")
@@ -369,8 +409,8 @@ def itinerary_agent(state: TravelState):
             ),
             HumanMessage(content=prompt)
         ])
-        itinerary_data = response.content
-        logger.info("✅ [itinerary_agent] Master itinerary generated successfully")
+        itinerary_data = sanitize_output(response.content)
+        logger.info("✅ [itinerary_agent] Master itinerary generated and sanitized successfully")
     except Exception as e:
         itinerary_data = f"Itinerary generation encountered an error: {e}"
         logger.error(f"❌ [itinerary_agent] Error: {e}", exc_info=True)
@@ -385,13 +425,23 @@ def itinerary_agent(state: TravelState):
 
 graph = StateGraph(TravelState)
 
+# Nodes
+graph.add_node("input_guardrail", input_guardrail_node)
 graph.add_node("flight_agent", flight_agent)
 graph.add_node("hotel_agent", hotel_agent)
 graph.add_node("weather_agent", weather_agent)
 graph.add_node("itinerary_agent", itinerary_agent)
 
-
-graph.add_edge(START, "flight_agent")
+# Edges with Conditional Guardrail Check
+graph.add_edge(START, "input_guardrail")
+graph.add_conditional_edges(
+    "input_guardrail",
+    guardrail_router,
+    {
+        "flight_agent": "flight_agent",
+        END: END,
+    }
+)
 graph.add_edge("flight_agent", "hotel_agent")
 graph.add_edge("hotel_agent", "weather_agent")
 graph.add_edge("weather_agent", "itinerary_agent")
@@ -458,8 +508,11 @@ if __name__ == "__main__":
             "user_query": user_input,
             "flight_results": "",
             "hotel_results": "",
+            "weather_results": "",
             "itinerary": "",
-            "llm_calls": 0
+            "llm_calls": 0,
+            "is_blocked": False,
+            "guardrail_status": "",
         },
         config=config
     )

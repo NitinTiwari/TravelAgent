@@ -77,6 +77,13 @@ R2_BUCKET_NAME = get_config_val("R2_BUCKET_NAME") or get_config_val("CLOUDFLARE_
 # ==========================================
 GROQ_PLANNER_MODEL = get_config_val("GROQ_PLANNER_MODEL", "openai/gpt-oss-20b")
 GROQ_DESTINATION_MODEL = get_config_val("GROQ_DESTINATION_MODEL", "openai/gpt-oss-20b")
+GROQ_PROMPT_GUARD_MODEL = get_config_val("GROQ_PROMPT_GUARD_MODEL", "meta-llama/llama-prompt-guard-2-86m")
+
+# ==========================================
+# 🛡️ Production Guardrail Configuration
+# ==========================================
+ENABLE_GUARDRAILS = get_config_val("ENABLE_GUARDRAILS", "true").lower() in ("true", "1", "yes")
+PROMPT_GUARD_THRESHOLD = float(get_config_val("PROMPT_GUARD_THRESHOLD", "0.7"))
 
 # ==========================================
 # ⚡ Semantic Cache TTL Settings (Seconds)
