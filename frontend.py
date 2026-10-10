@@ -96,16 +96,16 @@ header[data-testid="stHeader"] {
     margin: 0 !important;
 }
 
-/* ── Hero ── */
+/* ── Hero (Reduced 30%) ── */
 .hero-wrapper {
     position: relative;
-    border-radius: 20px;
+    border-radius: 14px;
     overflow: hidden;
     margin-top: 0 !important;
-    margin-bottom: 1.5rem;
-    height: 270px;
+    margin-bottom: 1.0rem;
+    height: 189px;
     border: 1px solid rgba(58,123,213,0.35);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5);
 }
 .hero-bg {
     width: 100%;
@@ -125,34 +125,36 @@ header[data-testid="stHeader"] {
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 2rem;
+    padding: 1.2rem;
     background: radial-gradient(circle, rgba(8,13,20,0.2) 0%, rgba(8,13,20,0.7) 100%);
 }
 .hero-badge {
     background: rgba(58,123,213,0.25);
     border: 1px solid rgba(58,123,213,0.5);
     color: #7ab8f5 !important;
-    font-size: 0.75rem;
+    font-size: 0.52rem;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    padding: 0.3rem 0.9rem;
-    border-radius: 20px;
-    margin-bottom: 0.9rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 14px;
+    margin-bottom: 0.45rem;
     display: inline-block;
 }
 .hero-title {
-    font-size: 2.6rem;
+    font-size: 1.82rem;
     font-weight: 700;
     color: #ffffff;
-    margin: 0 0 0.6rem;
+    margin: 0 0 0.4rem;
     line-height: 1.2;
 }
 .hero-sub {
     color: #94adc8;
-    font-size: 1rem;
-    max-width: 560px;
+    font-size: 0.7rem;
+    max-width: 400px;
+    line-height: 1.35;
 }
+
 
 /* ── Input card ── */
 .input-card {
